@@ -1,0 +1,47 @@
+name: CI-workflow
+
+on:
+  push:
+    branches:
+      - update
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: maven  # speeds up builds by caching ~/.m2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java
+
+      - name: Build and run tests
+        run: mvn clean verify
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+
+      # FIX 1: Corrected glob — surefire writes flat XML, no subdirectories
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: target/surefire-reports/*.xml
+
+      # FIX 2: Added if: always() so WAR uploads even when tests fail
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: java-build-artifacts
+          path: target/*.war
